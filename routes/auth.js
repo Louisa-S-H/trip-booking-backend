@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 
 const router = express.Router();
@@ -13,10 +14,23 @@ const generateToken = (userId, role) => {
   );
 };
 
-// Sign Up
-router.post('/signup', async (req, res) => {
+// Sign Up (public signup always creates a student account; Agent/Admin
+// accounts are created by an admin via POST /api/users)
+router.post(
+  '/signup',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('A valid email is required').normalizeEmail(),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  ],
+  async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: errors.array()[0].msg, errors: errors.array() });
+    }
+
+    const { name, email, password } = req.body;
 
     // Check if user exists
     const existingUser = await User.findOne({ email });
@@ -29,7 +43,7 @@ router.post('/signup', async (req, res) => {
       name,
       email,
       password,
-      role: role || 'student',
+      role: 'student',
     });
 
     await user.save();

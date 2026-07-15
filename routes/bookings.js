@@ -59,11 +59,21 @@ router.get('/agent/assignments', authMiddleware, roleMiddleware(['agent']), asyn
 // Get all bookings (Admin)
 router.get('/', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
   try {
-    const bookings = await Booking.find()
-      .populate('student', 'name email')
-      .populate('assignedAgent', 'name email')
-      .populate('services.service');
-    res.json(bookings);
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+
+    const [bookings, total] = await Promise.all([
+      Booking.find()
+        .populate('student', 'name email')
+        .populate('assignedAgent', 'name email')
+        .populate('services.service')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Booking.countDocuments(),
+    ]);
+
+    res.json({ bookings, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching bookings', error: err.message });
   }
@@ -80,6 +90,15 @@ router.get('/:id', authMiddleware, async (req, res) => {
     if (!booking) {
       return res.status(404).json({ message: 'Booking not found' });
     }
+
+    const { role, userId } = req.user;
+    if (role === 'student' && booking.student._id.toString() !== userId) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    if (role === 'agent' && (!booking.assignedAgent || booking.assignedAgent._id.toString() !== userId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
     res.json(booking);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching booking', error: err.message });
@@ -89,17 +108,24 @@ router.get('/:id', authMiddleware, async (req, res) => {
 // Update booking status (Agent/Admin)
 router.put('/:id/status', authMiddleware, roleMiddleware(['agent', 'admin']), async (req, res) => {
   try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    if (req.user.role === 'agent' && (!booking.assignedAgent || booking.assignedAgent.toString() !== req.user.userId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
     const { status, paymentStatus, notes } = req.body;
-    const booking = await Booking.findByIdAndUpdate(
-      req.params.id,
-      {
-        status,
-        paymentStatus: paymentStatus || booking.paymentStatus,
-        notes: notes || booking.notes,
-        updatedAt: Date.now(),
-      },
-      { new: true }
-    ).populate('student', 'name email').populate('services.service');
+    if (status) booking.status = status;
+    if (paymentStatus) booking.paymentStatus = paymentStatus;
+    if (notes !== undefined) booking.notes = notes;
+    booking.updatedAt = Date.now();
+
+    await booking.save();
+    await booking.populate('student', 'name email');
+    await booking.populate('services.service');
 
     res.json(booking);
   } catch (err) {

@@ -1,8 +1,32 @@
 const express = require('express');
+const { body, validationResult } = require('express-validator');
 const Service = require('../models/Service');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
+
+const CATEGORIES = ['Flight', 'Hotel', 'Activities', 'Bundles', 'Meet & Greet', 'Visa Application'];
+
+const serviceValidators = [
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('price').isFloat({ gt: 0 }).withMessage('Price must be greater than 0'),
+  body('category').isIn(CATEGORIES).withMessage('Invalid category'),
+];
+
+// Same rules but only applied when the field is present, for partial updates
+const serviceUpdateValidators = [
+  body('name').optional().trim().notEmpty().withMessage('Name is required'),
+  body('price').optional().isFloat({ gt: 0 }).withMessage('Price must be greater than 0'),
+  body('category').optional().isIn(CATEGORIES).withMessage('Invalid category'),
+];
+
+const checkValidation = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ message: errors.array()[0].msg, errors: errors.array() });
+  }
+  next();
+};
 
 // Get all services
 router.get('/', async (req, res) => {
@@ -35,7 +59,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create service (Admin only)
-router.post('/', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
+router.post('/', authMiddleware, roleMiddleware(['admin']), serviceValidators, checkValidation, async (req, res) => {
   try {
     const service = new Service(req.body);
     await service.save();
@@ -46,7 +70,7 @@ router.post('/', authMiddleware, roleMiddleware(['admin']), async (req, res) => 
 });
 
 // Update service (Admin only)
-router.put('/:id', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
+router.put('/:id', authMiddleware, roleMiddleware(['admin']), serviceUpdateValidators, checkValidation, async (req, res) => {
   try {
     const service = await Service.findByIdAndUpdate(
       req.params.id,
