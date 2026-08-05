@@ -206,7 +206,7 @@ async function seed() {
     {
       key: 'company_profile',
       title: 'Company Profile',
-      body: 'We design and run educational and incentive trips for student groups worldwide.',
+      body: 'Student Services Consultancy Pte Ltd (SSC) is a Singapore-based consultancy, founded in 2015, dedicated to providing comprehensive support for international students and their families transitioning to Singapore for education. With a focus on personalised services, SSC ensures a seamless experience by assisting with school placements, accommodation arrangements, and navigating the local education system. Our team offers tailored guidance to meet the unique needs of each student, fostering a smooth integration into Singapore\'s educational landscape.',
     },
     { upsert: true }
   );
@@ -224,7 +224,7 @@ async function seed() {
     {
       key: 'contact_info',
       title: 'Contact Us',
-      body: 'Email: hello@example.com | Hotline: +852 1234 5678',
+      body: 'Phone: (+65) 8714 8588. Headquarters: 31 Harrison Road #05-03, Food Empire Building, Singapore 369649. We also have a campus office at Singapore Management University, 40 Stamford Road, Level 3 & 4 SMU Connexion, Singapore 730015.',
     },
     { upsert: true }
   );
